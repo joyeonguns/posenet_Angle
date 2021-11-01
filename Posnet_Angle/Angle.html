@@ -1,0 +1,227 @@
+<html>
+  <head>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- Load Posenet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+    <style>
+      /* 이미지에 캔버스를 겹쳐서 그릴때는 아래 주석 해제 */
+      canvas {
+          position: relative;
+      } 
+
+      img {
+          position: absolute;
+      }
+      button{
+          position: absolute;
+          right: 0;
+      }
+  </style>
+ 
+  </head>
+
+  <body>
+    <img id='img' src=''/>
+    <canvas id="canvas"></canvas>
+    <input type = "file" id = 'button'>
+    <img src = "" id="myImg">  
+  </body>
+  
+  <!-- Place your code in the script tag below. You can also use an external .js file -->
+  <script>
+    
+    window.addEventListener('load', function() {
+      document.querySelector('input[type="file"]').addEventListener('change', function() {
+          if (this.files && this.files[0]) {
+              img = document.querySelector('img');
+              img.onload = () => {
+                  URL.revokeObjectURL(img.src);  // no longer needed, free memory
+              }
+
+              img.src = URL.createObjectURL(this.files[0]); // set src to blob url
+
+              var ubody_x, ubody_y, dbody_x, dbody_y;
+    var angle = [];
+    var qd = [];
+    var flipHorizontal = false;
+
+    //const img = document.getElementById('img');
+    
+    const canvas = document.getElementById("canvas");
+        const context = canvas.getContext("2d");
+
+    posenet.load().then(function(net) {
+      const pose = net.estimateSinglePose(img, {
+        flipHorizontal: false
+      });
+      return pose;
+    }).then(function(pose){
+      console.log(pose);
+      console.log(img.width, img.height);
+    
+      canvas.width = img.width;
+      canvas.height = img.height;
+      drawKeypoints(pose.keypoints, 0.5, context)
+     
+      ubody_x = (pose.keypoints[5].position.x + pose.keypoints[6].position.x)/2;
+      ubody_y = (pose.keypoints[5].position.y + pose.keypoints[6].position.y)/2;
+      dbody_x = (pose.keypoints[11].position.x + pose.keypoints[12].position.x)/2;
+      dbody_y = (pose.keypoints[11].position.y + pose.keypoints[12].position.y)/2;
+
+      context.fillStyle = "#FF0000";
+      context.fillRect(ubody_x,ubody_y,10,10)
+      console.log(ubody_x,ubody_y);
+
+   
+      ubody = new vector2(ubody_x,ubody_y);
+      dbody = new vector2(dbody_x,dbody_y);
+
+      var cossine = [ 
+           cosine(ubody,pose.keypoints[5].position,pose.keypoints[7].position),
+           cosine(pose.keypoints[5].position,pose.keypoints[7].position,pose.keypoints[9].position),
+           cosine(ubody,pose.keypoints[6].position,pose.keypoints[8].position),
+           cosine(pose.keypoints[6].position,pose.keypoints[8].position,pose.keypoints[10].position),
+           cosine(dbody,pose.keypoints[11].position,pose.keypoints[13].position),
+           cosine(pose.keypoints[11].position,pose.keypoints[13].position,pose.keypoints[15].position),
+           cosine(dbody,pose.keypoints[12].position,pose.keypoints[14].position),
+           cosine(pose.keypoints[12].position,pose.keypoints[14].position,pose.keypoints[16].position)
+      ] ;
+
+      for(var i = 0; i < 8; i++)
+      {
+          cossine[i] = ToAlgel(cossine[i]);
+      }
+
+       
+      console.log("왼 어깨 각도 : ",cosine(ubody,pose.keypoints[5].position,pose.keypoints[7].position).toFixed(3)," " ,cossine[0] );
+      console.log("왼 팔 각도 : ",cosine(pose.keypoints[5].position,pose.keypoints[7].position,pose.keypoints[9].position).toFixed(3)," " ,cossine[1]);
+      console.log("오른 어깨 각도 : ",cosine(ubody,pose.keypoints[6].position,pose.keypoints[8].position).toFixed(3)," " ,cossine[2]);
+      console.log("오른 팔 각도 : ",cosine(pose.keypoints[6].position,pose.keypoints[8].position,pose.keypoints[10].position).toFixed(3)," " ,cossine[3]);
+      console.log("왼 골반 각도 : ",cosine(dbody,pose.keypoints[11].position,pose.keypoints[13].position).toFixed(3)," " ,cossine[4]);
+      console.log("왼 다리 각도 : ",cosine(pose.keypoints[11].position,pose.keypoints[13].position,pose.keypoints[15].position).toFixed(3)," " ,cossine[5]);
+      console.log("오른 골반 각도 : ",cosine(dbody,pose.keypoints[12].position,pose.keypoints[14].position).toFixed(3)," " ,cossine[6]);
+      console.log("오른 다리 각도 : ",cosine(pose.keypoints[12].position,pose.keypoints[14].position,pose.keypoints[16].position).toFixed(3)," " ,cossine[7]);
+      
+      console.log(cossine[0],", ",cossine[1],", ",cossine[2],", ",cossine[3],", ",cossine[4],", ",cossine[5],", ",cossine[6],", ",cossine[7]);
+     
+
+     
+
+    })
+
+    
+
+          }
+      });
+    });
+    const color = 'aqua';
+    const boundingBoxColor = 'red';
+    const lineWidth = 2;
+
+  function ToAlgel(cos) {
+      
+      var angle = Math.acos(cos)  * 180 / Math.PI
+      return angle.toFixed(2);
+  }
+     
+
+  function toTuple({y, x}) 
+  {
+    return [y, x];  
+  }
+
+ function drawPoint(ctx, y, x, r, color) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function veclenth(x,y) {
+  return Math.sqrt(x * x +y* y);
+}
+
+function veclenth1(a,b) {
+  var x = a.position.x - b.position.x;
+  var y = a.position.y - b.position.y;
+  return Math.sqrt(x**2+y**2);
+}
+function cosine(a,b,c) {
+  var vec1 = new vector2(a.x - b.x, a.y - b.y);
+  var vec2 = new vector2(c.x - b.x, c.y - b.y);
+  var cos = (vec1.x * vec2.x + vec1.y * vec2.y) / (vec1.length() * vec2.length());
+  return cos;
+}
+
+
+/**
+ * Draws a line on a canvas, i.e. a joint
+ */
+ function drawSegment([ay, ax], [by, bx], color, scale, ctx) {
+  ctx.beginPath();
+  ctx.moveTo(ax * scale, ay * scale);
+  ctx.lineTo(bx * scale, by * scale);
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+}
+
+/**
+ * Draws a pose skeleton by looking up all adjacent keypoints/joints
+ */
+ function drawSkeleton(keypoints, minConfidence, ctx, scale = 1) {
+  const adjacentKeyPoints =
+      posenet.getAdjacentKeyPoints(keypoints, minConfidence);
+
+  adjacentKeyPoints.forEach((keypoints) => {
+    drawSegment(
+        toTuple(keypoints[0].position), toTuple(keypoints[1].position), color,
+        scale, ctx);
+  });
+}
+
+/**
+ * Draw pose keypoints onto a canvas
+ */
+ function drawKeypoints(keypoints, minConfidence, ctx, scale = 1) {
+  for (let i = 0; i < keypoints.length; i++) {
+    const keypoint = keypoints[i];
+
+    if (keypoint.score < minConfidence) {
+      continue;
+    }
+
+    const {y, x} = keypoint.position;
+    drawPoint(ctx, y * scale, x * scale, 3, color);
+  }
+}
+
+/**
+ * Draw the bounding box of a pose. For example, for a whole person standing
+ * in an image, the bounding box will begin at the nose and extend to one of
+ * ankles
+ */
+ function drawBoundingBox(keypoints, ctx) {
+  const boundingBox = posenet.getBoundingBox(keypoints);
+
+  ctx.rect(
+      boundingBox.minX, boundingBox.minY, boundingBox.maxX - boundingBox.minX,
+      boundingBox.maxY - boundingBox.minY);
+
+  ctx.strokeStyle = boundingBoxColor;
+  ctx.stroke();
+}
+
+class vector2 {
+  constructor(x,y){
+    this.x = x;
+    this.y = y;
+  }
+  length() {
+    return Math.sqrt(this.x**2+this.y**2);
+  }
+}
+
+  </script>
+</html>
